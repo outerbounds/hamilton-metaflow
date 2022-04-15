@@ -1,4 +1,4 @@
-from hamilton.function_modifiers import parametrized_inputs
+from hamilton.function_modifiers import parameterized_inputs
 import pandas as pd
 
 NUMERIC_FEATURES = ['age', 'height', 'weight', 'body_mass_index', 'transportation_expense',
@@ -6,25 +6,25 @@ NUMERIC_FEATURES = ['age', 'height', 'weight', 'body_mass_index', 'transportatio
                     'hit_target']
 
 
-@parametrized_inputs(**{f'{k}_mean': dict(feature=k) for k in NUMERIC_FEATURES})
+@parameterized_inputs(**{f'{k}_mean': dict(feature=k) for k in NUMERIC_FEATURES})
 def mean_computer(feature: pd.Series) -> pd.Series:
     """Average of {feature}"""
     return feature.mean()
 
 
-@parametrized_inputs(**{f'{k}_std_dev': dict(feature=k) for k in NUMERIC_FEATURES})
+@parameterized_inputs(**{f'{k}_std_dev': dict(feature=k) for k in NUMERIC_FEATURES})
 def std_dev_computer(feature: pd.Series) -> pd.Series:
     """Standard deviation of {feature}"""
     return feature.std()
 
 
-@parametrized_inputs(**{f'{k}_zero_mean': dict(feature=k, feature_mean=f'{k}_mean') for k in NUMERIC_FEATURES})
+@parameterized_inputs(**{f'{k}_zero_mean': dict(feature=k, feature_mean=f'{k}_mean') for k in NUMERIC_FEATURES})
 def zero_mean_computer(feature: pd.Series, feature_mean: pd.Series) -> pd.Series:
     """Creates zero mean value of {feature} by subtracting {feature_mean}"""
     return feature - feature_mean
 
 
-@parametrized_inputs(**{f'{k}_zero_mean_unit_var': dict(feature_mean=f'{k}_mean', feature_std_dev=f'{k}_std_dev')
+@parameterized_inputs(**{f'{k}_zero_mean_unit_var': dict(feature_mean=f'{k}_mean', feature_std_dev=f'{k}_std_dev')
                         for k in NUMERIC_FEATURES})
 def zero_mean_unit_var_computer(feature_mean: pd.Series, feature_std_dev: pd.Series) -> pd.Series:
     """Computes zero mean unit variance of {feature_mean} with {feature_std_dev} to create {output_name}"""
