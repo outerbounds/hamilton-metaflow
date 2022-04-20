@@ -171,7 +171,7 @@ class FeatureSelectionAndClassification(FlowSpec):
     @step 
     def automl(self):
         '''tpot.TPOTClassifier'''
-        # TODO: Run this for long time on AWS.
+        # TODO: Run this on AWS. 
         from tpot import TPOTClassifier
         params = {"generations":2, "population_size":2, "cv":2, 
                   "random_state":RANDOM_STATE, "verbosity":2}
