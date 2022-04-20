@@ -1,2 +1,11 @@
 pandas
 sf-hamilton
+metaflow
+numpy
+sklearn
+imbalanced-learn
+skrebate
+matplotlib
+xgboost
+torch 
+skorch
