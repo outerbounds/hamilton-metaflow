@@ -2,10 +2,10 @@ pandas
 sf-hamilton
 metaflow
 numpy
-sklearn
+scikit-learn
 skrebate
 matplotlib
 xgboost
-torch 
+pytorch 
 skorch
 tpot
