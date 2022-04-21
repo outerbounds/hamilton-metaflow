@@ -1,3 +1,48 @@
+# Installation
+## Option 1: conda
+```
+conda env create -f ./absenteeism/conda-env.yml
+conda activate ham-flow
+```
+
+## Option 2: venv
+### Create venv
+```
+python3 venv -m ham-flow
+```
+
+### Activate venv
+* On Unix or MacOS, using the bash shell: `source ham-flow/bin/activate`
+* On Unix or MacOS, using the csh shell: `source ham-flow/bin/activate.csh`
+* On Unix or MacOS, using the fish shell: `source ham-flow/bin/activate.fish`
+* On Windows using the Command Prompt: `ham-flow\Scripts\activate.bat`
+* On Windows using PowerShell: `ham-flow\Scripts\Activate.ps1`
+
+### Install requirements from PyPi
+```
+pip3 install -r requirements.txt --no-cache
+```
+
+# Running the Flow 
+```
+python ./absenteeism/flow.py run
+```
+# Inspecting Results
+This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser by running 
+```
+python ./absenteeism/flow.py card view <step name>
+```
+
+For example, the `start` step displays class label distribution plots:
+```
+python ./absenteeism/flow.py card view start
+```
+
+# Paper Reference
+* [Application of a neuro fuzzy network in prediction of absenteeism at work](https://ieeexplore.ieee.org/document/6263151)
+* [Prediction Of Absenteeism At Work With Multinomial Logistic Regression Model](https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL)
+* [Identification of Important Features and Data Mining Classification Techniques in Predicting Employee  Absenteeism at Work](http://ijece.iaescore.com/index.php/IJECE/article/view/25232)
+
 # Dataset reference
-https://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work
+* https://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work
 

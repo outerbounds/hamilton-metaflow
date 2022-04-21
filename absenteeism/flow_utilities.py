@@ -52,13 +52,6 @@ def plot_labels(labels, raw_data):
     return figure
 
 
-def get_correlation_matrix(df):
-    '''
-    https://stackoverflow.com/questions/33997753/calculating-pairwise-correlation-among-all-columns
-    '''
-    df.corr().mean().index()
-
-
 def cbfs(features:pd.DataFrame, N=15):
     '''
     simplified version of:
