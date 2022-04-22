@@ -6,7 +6,7 @@ import pandas as pd
 data_columns = ['id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week', 'seasons', 'transportation_expense',
                 'distance_from_residence_to_work', 'service_time', 'age', 'work_load_average_per_day', 'hit_target',
                 'disciplinary_failure', 'education', 'son', 'social_drinker', 'social_smoker', 'pet', 'weight',
-                'height', 'body_mass_index', 'absenteeism_time_in_hours']
+                'height', 'body_mass_index']
 
 
 
