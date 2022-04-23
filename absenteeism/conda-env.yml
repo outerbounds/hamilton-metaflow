@@ -17,4 +17,4 @@ dependencies:
     - torch==1.11.0
     - skorch==0.11.0
     - tpot==0.11.7
-    
+    - graphviz==0.20

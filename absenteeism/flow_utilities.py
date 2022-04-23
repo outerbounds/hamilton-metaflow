@@ -1,22 +1,23 @@
 from time import time
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-from torch import nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats.stats import pearsonr
 import itertools
 import pandas as pd
+from torch import nn
+import torch.nn.functional as F
 
 
-RANDOM_STATE = 0
-RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
-LABEL_COL_NAME = "Absenteeism time in hours"
-RAW_FEATURES_LOCATION = "./data/raw_features.csv"
-TPOT_SCRIPT_DESTINATION = "./tpot_optimized_pipeline.py"
+class Config:
+    RANDOM_STATE = 0
+    RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
+    LABEL_COL_NAME = "Absenteeism time in hours"
+    RAW_FEATURES_LOCATION = "./data/raw_features.csv"
+    TPOT_SCRIPT_DESTINATION = "./tpot_optimized_pipeline.py"
+    HAMILTON_VIZ_PATH = "./feature_dag"
+    EXCLUDED_COLS = {'id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week'}
 
 
-def label_encoding(x):
+def encode_labels(x):
     '''
     encode labels for classification task described in:
         https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL
@@ -32,6 +33,7 @@ def label_encoding(x):
 
 
 def plot_labels(labels, raw_data):
+    import matplotlib.pyplot as plt
     figure = plt.figure(figsize=(16,6))
     # show classes for task from paper
     buckets = ["0 hours", "1-15 hours", "16-120 hours"]
@@ -41,7 +43,7 @@ def plot_labels(labels, raw_data):
     # show label distribution graphic from paper
     buckets = [0, 1, 2, 3, 4, 5, 7, 8, 16, 24, 32, 48, 56, 64, 80, 104, 112, 120]; employee_count = []
     for num_absent_hours in buckets:
-        employee_count.append((raw_data[LABEL_COL_NAME] == num_absent_hours).sum())
+        employee_count.append((raw_data[Config.LABEL_COL_NAME] == num_absent_hours).sum())
     ax2 = figure.add_subplot(122)
     buckets = [str(b) for b in buckets]
     ticks = np.arange(len(buckets))
@@ -50,6 +52,19 @@ def plot_labels(labels, raw_data):
     ax2.set_xlabel("Hours Absent", fontsize=18)
     figure.suptitle("Label Distribution", fontsize=24)
     return figure
+
+
+def hamilton_viz(dr, features_wanted):
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    dr.visualize_execution(features_wanted,
+        output_file_path=Config.HAMILTON_VIZ_PATH, render_kwargs={'format': 'png'})
+    img = Image.open(f'{Config.HAMILTON_VIZ_PATH}.png')
+    fig = plt.figure(figsize=(20,4))
+    ax = fig.add_subplot(111)
+    ax.imshow(img)
+    ax.axis('off')
+    return fig
 
 
 def cbfs(features:pd.DataFrame, N=15):
@@ -71,6 +86,7 @@ def cbfs(features:pd.DataFrame, N=15):
         
 
 def plot_xgb_importances(booster):
+    import matplotlib.pyplot as plt
     from xgboost import plot_importance
     figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(20,16))
     plt.draw()

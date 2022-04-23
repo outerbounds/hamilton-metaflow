@@ -23,7 +23,18 @@ python3 venv -m ham-flow
 pip3 install -r requirements.txt --no-cache
 ```
 
-# Running the Flow 
+## Note about visualizing Hamilton flow
+In the `flow.py` step called `featurize_and_split` the code is configured to visualize the hamilton DAG.
+To run this you need to have graphviz on your system PATH. 
+A recommended approach is to [install graphviz at system level](https://graphviz.org/download/). 
+* On MacOS: `brew install graphviz`
+* On Unix: `sudo apt-get install graphviz`
+* On Windows: `choco install -y graphviz`
+* More alternatives are discussed [here](https://stackoverflow.com/questions/35064304/runtimeerror-make-sure-the-graphviz-executables-are-on-your-systems-path-aft).
+
+# Running the Flow
+Note: The flow is currently running the `automl` step on AWS using Metaflow's @batch decorator. If you have not done `metaflow configure aws` you will want to comment this decorator out when running this flow. 
+
 ```
 python ./absenteeism/flow.py run
 ```
@@ -36,6 +47,16 @@ python ./absenteeism/flow.py card view <step name>
 For example, the `start` step displays class label distribution plots:
 ```
 python ./absenteeism/flow.py card view start
+```
+
+You can also look at the scores of each modeling step like: 
+``` python 
+from metaflow import Flow
+flow_data = Flow('FeatureSelectionAndClassification').latest_run.data
+print(flow_data.mlr_scores)
+print(flow_data.xgb_scores)
+print(flow_data.nn_scores)
+print(flow_data.tpot_scores)
 ```
 
 # Paper Reference

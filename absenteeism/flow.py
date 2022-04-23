@@ -1,13 +1,10 @@
-from metaflow import FlowSpec, step, Parameter, card, current, conda
+from metaflow import FlowSpec, step, Parameter, card, current, conda, batch
 from metaflow.cards import Image
-from flow_utilities import * 
+from flow_utilities import Config
 
 
 class FeatureSelectionAndClassification(FlowSpec):
     '''
-    inputs
-        data_location: str = location of dataset
-
     flow description
         task A: Featurize raw data using hamilton.
         task B: Compare and visualize feature selection methods. 
@@ -20,6 +17,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL
     '''
 
+    @conda(disabled=True)
     @card
     @step
     def start(self): 
@@ -29,15 +27,18 @@ class FeatureSelectionAndClassification(FlowSpec):
         '''
         import pandas as pd
         import numpy as np
-        raw_data = pd.read_csv(RAW_DATA_LOCATION, sep=";")
-        self.raw_data_features = raw_data.drop(columns=[LABEL_COL_NAME])
-        self.labels = raw_data[LABEL_COL_NAME].apply(label_encoding)
-        self.raw_data_features.to_csv(RAW_FEATURES_LOCATION, index=False, sep=";")
+        from flow_utilities import plot_labels, encode_labels
+        raw_data = pd.read_csv(Config.RAW_DATA_LOCATION, sep=";")
+        self.raw_data_features = raw_data.drop(columns=[Config.LABEL_COL_NAME])
+        self.labels = raw_data[Config.LABEL_COL_NAME].apply(encode_labels)
+        self.raw_data_features.to_csv(Config.RAW_FEATURES_LOCATION, index=False, sep=";")
         figure = plot_labels(labels = self.labels.value_counts().values, raw_data = raw_data)
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.featurize_and_split)
 
 
+    @card
+    @conda(disabled=True)
     @step
     def featurize_and_split(self):
         '''
@@ -49,20 +50,25 @@ class FeatureSelectionAndClassification(FlowSpec):
         import feature_logic
         import normalized_features
         from sklearn.model_selection import train_test_split
-        dr = driver.Driver({"location": RAW_FEATURES_LOCATION},
+        from flow_utilities import hamilton_viz
+        dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
-        columns_to_exclude = {'id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week'}
-        # TODO: curate specific list of features
         features_wanted = [n.name for n in dr.list_available_variables()
-                           if n.name not in columns_to_exclude and n.type == pd.Series]
+                           if n.name not in Config.EXCLUDED_COLS and n.type == pd.Series]
         self.full_featurized_data = dr.execute(features_wanted)
+        # NOTE: Metaflow card's Image viewer forces everything into a square view.
+        # this makes card viewer somewhat ineffective for Hamilton DAG which is much wider than tall. 
+        # If we are feeling fancy and want to spend more hours on this we could 
+        # map hamilton.graph.FunctionGraph to a metaflow.cards.DAG type in cards/ui/src/types.js  
+        current.card.append(Image.from_matplotlib(hamilton_viz(dr, features_wanted)))
         self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full = train_test_split(
-            self.full_featurized_data, self.labels, test_size=0.2, random_state=RANDOM_STATE)
+            self.full_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
         self.next(self.relief_based_feature_selection, 
             self.correlation_based_feature_selection,
             self.info_gain_feature_selection)
 
 
+    @conda(disabled=True)
     @step 
     def relief_based_feature_selection(self):
         '''
@@ -79,16 +85,19 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.feature_importance_merge)
 
 
+    @conda(disabled=True)
     @step 
     def correlation_based_feature_selection(self):
         '''
         Compute feature importance based on a low correlation with other features.
         '''
+        from flow_utilities import cbfs
         feature_names, correlation_when_removed = cbfs(self.train_x_full, N=10)
         self.cbfs = {name:score for name, score in zip(feature_names, correlation_when_removed)}
         self.next(self.feature_importance_merge)
 
 
+    @conda(disabled=True)
     @step 
     def info_gain_feature_selection(self):
         '''
@@ -102,6 +111,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.feature_importance_merge)
 
 
+    @conda(disabled=True)
     @step
     def feature_importance_merge(self, inputs):
         '''
@@ -117,6 +127,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.classifiers_dag)
 
 
+    @conda(disabled=True)
     @step
     def classifiers_dag(self):
         self.next(self.multinomial_logistic_regression, 
@@ -125,19 +136,22 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.automl)
 
 
+    @conda(disabled=True)
     @step 
     def multinomial_logistic_regression(self):
         '''sklearn.linear_model.LogisticRegression models'''
         # TODO: tune params
         from sklearn.linear_model import LogisticRegression
         from time import time
-        params = {"penalty": "l2", "solver":"lbfgs", "random_state": RANDOM_STATE,
+        from flow_utilities import fit_and_score_multiclass_model
+        params = {"penalty": "l2", "solver":"lbfgs", "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "multi_class": "multinomial"}
         self.mlr_model, self.mlr_scores = fit_and_score_multiclass_model(LogisticRegression(**params), 
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
         self.next(self.visualize_model_scores)
 
 
+    @conda(disabled=True)
     @card
     @step 
     def xgboost(self):
@@ -145,7 +159,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         # TODO: tune params
         from xgboost import XGBClassifier
         import matplotlib.pyplot as plt
-        params = {"n_estimators": 1000, "max_depth":10, "random_state": RANDOM_STATE,
+        from flow_utilities import fit_and_score_multiclass_model, plot_xgb_importances
+        params = {"n_estimators": 1000, "max_depth":10, "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "learning_rate": .1, "objective": "multi:softmax"}
         self.xgb_model, self.xgb_scores = fit_and_score_multiclass_model(XGBClassifier(**params), 
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
@@ -154,12 +169,14 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.visualize_model_scores)
 
 
+    @conda(disabled=True)
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
         # TODO: tune params (in flow_utilities.py)
         from skorch import NeuralNetClassifier
         import numpy as np
+        from flow_utilities import fit_and_score_multiclass_model, SkorchModule
         params = {"module": SkorchModule(num_input_feats=self.train_x_full.shape[1]), 
             "max_epochs":10, "lr":0.1, "iterator_train__shuffle": True, "verbose":0}
         self.nn_model, self.nn_scores = fit_and_score_multiclass_model(NeuralNetClassifier(**params), 
@@ -168,20 +185,22 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.visualize_model_scores)
 
 
+    @conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12")
+    @batch(cpu=12)
     @step 
     def automl(self):
         '''tpot.TPOTClassifier'''
-        # TODO: Run this on AWS. 
         from tpot import TPOTClassifier
-        params = {"generations":2, "population_size":2, "cv":2, 
-                  "random_state":RANDOM_STATE, "verbosity":2}
+        from flow_utilities import fit_and_score_multiclass_model
+        params = {"generations":20, "population_size":5, "cv":5, 
+                  "random_state":Config.RANDOM_STATE, "verbosity":2}
         tpot_model, self.tpot_scores = fit_and_score_multiclass_model(TPOTClassifier(**params), 
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
-        # tpot_model.export(TPOT_SCRIPT_DESTINATION)
+        tpot_model.export(Config.TPOT_SCRIPT_DESTINATION)
         self.next(self.visualize_model_scores)
 
 
-
+    @conda(disabled=True)
     @step
     def visualize_model_scores(self, inputs):
         '''
@@ -200,6 +219,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.end)
 
 
+    @conda(disabled=True)
     @step
     def end(self):
         pass
