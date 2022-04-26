@@ -1,6 +1,15 @@
 from metaflow import FlowSpec, step, Parameter, card, current, conda, batch
 from metaflow.cards import Image
 from flow_utilities import Config
+import functools
+
+
+def install_torch_dependencies(packages):
+    '''implement as base class of StepDecorator in plugins.STEP_DECORATORS.'''
+    import subprocess
+    import sys
+    for package in packages:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
 
 class FeatureSelectionAndClassification(FlowSpec):
@@ -17,13 +26,13 @@ class FeatureSelectionAndClassification(FlowSpec):
             https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL
     '''
 
+
     @conda(disabled=True)
     @card
     @step
     def start(self): 
         '''
         Show distribution of class labels in matplotlib figure.
-        Pass to hamilton featurization step.
         '''
         import pandas as pd
         import numpy as np
@@ -81,7 +90,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         from copy import deepcopy
         rbfs = ReliefF()
         rbfs.fit(self.train_x_full.values, self.train_y_full.values)
-        self.rbfs = {name:score for name, score in zip(list(self.train_x_full.columns), rbfs.feature_importances_)}
+        self.rbfs = {name:score for name, score in zip(list(self.train_x_full.columns), 
+            rbfs.feature_importances_)}
         self.next(self.feature_importance_merge)
 
 
@@ -107,7 +117,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         selector = SelectKBest(mutual_info_classif, k=10)
         selected_features = selector.fit_transform(self.train_x_full, self.train_y_full)
         idxs = selector.get_support(indices=True)
-        self.igfs = {name:score for name,score in zip(self.train_x_full.columns[idxs], selector.scores_[idxs])}
+        self.igfs = {name:score for name,score in zip(self.train_x_full.columns[idxs], 
+            selector.scores_[idxs])}
         self.next(self.feature_importance_merge)
 
 
@@ -151,7 +162,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.visualize_model_scores)
 
 
-    @conda(disabled=True)
+    @conda(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
+        "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
     @card
     @step 
     def xgboost(self):
@@ -169,14 +181,18 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.visualize_model_scores)
 
 
-    @conda(disabled=True)
+    @batch(cpu=8)
+    @conda(libraries={"pip":"22.0.4"}, python="3.9.12") 
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
         # TODO: tune params (in flow_utilities.py)
+        install_torch_dependencies(["torch==1.11.0", "skorch==0.11.0", 
+            "scikit-learn==1.0.2", "pandas==1.4.2"]) # commment this function call out if you are not on batch
         from skorch import NeuralNetClassifier
         import numpy as np
-        from flow_utilities import fit_and_score_multiclass_model, SkorchModule
+        from flow_utilities import fit_and_score_multiclass_model
+        from torch_model import SkorchModule
         params = {"module": SkorchModule(num_input_feats=self.train_x_full.shape[1]), 
             "max_epochs":10, "lr":0.1, "iterator_train__shuffle": True, "verbose":0}
         self.nn_model, self.nn_scores = fit_and_score_multiclass_model(NeuralNetClassifier(**params), 

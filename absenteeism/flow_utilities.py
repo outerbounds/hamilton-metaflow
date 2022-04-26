@@ -1,12 +1,3 @@
-from time import time
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-import numpy as np
-import itertools
-import pandas as pd
-from torch import nn
-import torch.nn.functional as F
-
-
 class Config:
     RANDOM_STATE = 0
     RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
@@ -34,6 +25,7 @@ def encode_labels(x):
 
 def plot_labels(labels, raw_data):
     import matplotlib.pyplot as plt
+    import numpy as np
     figure = plt.figure(figsize=(16,6))
     # show classes for task from paper
     buckets = ["0 hours", "1-15 hours", "16-120 hours"]
@@ -67,7 +59,7 @@ def hamilton_viz(dr, features_wanted):
     return fig
 
 
-def cbfs(features:pd.DataFrame, N=15):
+def cbfs(features, N=15):
     '''
     simplified version of:
         https://www.hindawi.com/journals/complexity/2018/2520706/    
@@ -104,6 +96,8 @@ def plot_xgb_importances(booster):
 
 
 def fit_and_score_multiclass_model(model, train_x, train_y, valid_x, valid_y):
+    from time import time
+    from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
     t0_train = time()
     model.fit(train_x, train_y)
     tf_train = time()
@@ -119,21 +113,3 @@ def fit_and_score_multiclass_model(model, train_x, train_y, valid_x, valid_y):
         'training time': tf_train - t0_train,
         "prediction time": tf_valid - t0_valid
     }
-
-
-class SkorchModule(nn.Module):
-    def __init__(self, num_input_feats=59, num_units=10, nonlin=F.relu, num_classes=3):
-        super(SkorchModule, self).__init__()
-
-        self.dense0 = nn.Linear(num_input_feats, num_units)
-        self.nonlin = nonlin
-        self.dropout = nn.Dropout(0.5)
-        self.dense1 = nn.Linear(num_units, 10)
-        self.output = nn.Linear(10, num_classes)
-
-    def forward(self, X, **kwargs):
-        X = self.nonlin(self.dense0(X))
-        X = self.dropout(X)
-        X = F.relu(self.dense1(X))
-        X = F.softmax(self.output(X))
-        return X

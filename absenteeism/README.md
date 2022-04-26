@@ -13,10 +13,6 @@ python3 venv -m ham-flow
 
 ### Activate venv
 * On Unix or MacOS, using the bash shell: `source ham-flow/bin/activate`
-* On Unix or MacOS, using the csh shell: `source ham-flow/bin/activate.csh`
-* On Unix or MacOS, using the fish shell: `source ham-flow/bin/activate.fish`
-* On Windows using the Command Prompt: `ham-flow\Scripts\activate.bat`
-* On Windows using PowerShell: `ham-flow\Scripts\Activate.ps1`
 
 ### Install requirements from PyPi
 ```
@@ -29,7 +25,6 @@ To run this you need to have graphviz on your system PATH.
 A recommended approach is to [install graphviz at system level](https://graphviz.org/download/). 
 * On MacOS: `brew install graphviz`
 * On Unix: `sudo apt-get install graphviz`
-* On Windows: `choco install -y graphviz`
 * More alternatives are discussed [here](https://stackoverflow.com/questions/35064304/runtimeerror-make-sure-the-graphviz-executables-are-on-your-systems-path-aft).
 
 # Running the Flow
