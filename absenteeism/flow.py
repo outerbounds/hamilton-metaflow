@@ -1,14 +1,7 @@
 from metaflow import FlowSpec, step, Parameter, card, current, conda, batch
 from metaflow.cards import Image
-from flow_utilities import Config
+from flow_utilities import Config, pip
 import functools
-
-
-def install_torch_dependencies(packages):
-    import subprocess
-    import sys
-    for package in packages:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
 
 class FeatureSelectionAndClassification(FlowSpec):
@@ -171,13 +164,13 @@ class FeatureSelectionAndClassification(FlowSpec):
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.visualize_model_scores)
 
-    @batch(cpu=8)
+    @batch(cpu=4)
     @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12") 
+    @pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"})
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
         # TODO: tune params (in flow_utilities.py)
-        install_torch_dependencies(["torch==1.11.0", "skorch==0.11.0"]) # commment this function call out if you are not on batch
         from skorch import NeuralNetClassifier
         import numpy as np
         from flow_utilities import fit_and_score_multiclass_model

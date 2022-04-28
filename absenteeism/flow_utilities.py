@@ -7,6 +7,23 @@ class Config:
     HAMILTON_VIZ_PATH = "./feature_dag"
     EXCLUDED_COLS = {'id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week'}
 
+def pip(libraries):
+    from functools import wraps
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import subprocess
+            import sys
+            for library, version in libraries.items():
+                print("installing:", library, version)
+                if version != "":
+                    subprocess.run([sys.executable, "-m", "pip", "install", library + "==" + version])
+                else:
+                    subprocess.run([sys.executable, "-m", "pip", "install", library])
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
 
 def encode_labels(x):
     '''
