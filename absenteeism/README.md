@@ -31,7 +31,7 @@ A recommended approach is to [install graphviz at system level](https://graphviz
 Note: The flow is currently running the `automl` step on AWS using Metaflow's @batch decorator. If you have not done `metaflow configure aws` you will want to comment this decorator out when running this flow. 
 
 ```
-python ./absenteeism/flow.py run
+python ./absenteeism/flow.py --environment=conda run
 ```
 # Inspecting Results
 This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser by running 

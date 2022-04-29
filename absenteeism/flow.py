@@ -164,7 +164,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.visualize_model_scores)
 
-    @batch(cpu=4)
+    #@batch(cpu=4)
     @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12") 
     @pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"})
     @step 
@@ -182,8 +182,8 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.validation_x_full.values.astype(np.float32), self.validation_y_full.values.astype(np.int64))
         self.next(self.visualize_model_scores)
 
+    #@batch(cpu=12)
     @conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12")
-    @batch(cpu=12)
     @step 
     def automl(self):
         '''tpot.TPOTClassifier'''
