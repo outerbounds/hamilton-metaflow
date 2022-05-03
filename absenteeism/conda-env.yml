@@ -7,7 +7,7 @@ dependencies:
   - pip:
     - setuptools==57.5.0
     - pandas==1.4.2
-    - sf-hamilton==1.6.0
+    - sf-hamilton==1.7.0
     - metaflow==2.5.4
     - numpy==1.22.3
     - scikit-learn==1.0.2
