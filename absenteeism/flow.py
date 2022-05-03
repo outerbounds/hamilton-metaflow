@@ -1,26 +1,28 @@
-from metaflow import FlowSpec, step, Parameter, card, current, conda, batch
+from metaflow import FlowSpec, step, Parameter, card, current, conda, batch, environment
 from metaflow.cards import Image
-from flow_utilities import Config, pip
-import functools
-
+from flow_utilities import Config, pip, switch_compute
+import os
 
 class FeatureSelectionAndClassification(FlowSpec):
 
     '''
-    flow description
-        task A: Featurize raw data using hamilton.
+    =================
+    Flow description
+        task A: Featurize raw data using hamilton. A hamilton dag visualization will be stored in a Metaflow card.
         task B: Compare and visualize feature selection methods. 
         task C: Compare and visualize classification modeling approaches.
-
         Task B's feature selection flow is inspired by section 3.2 of: 
             http://ijece.iaescore.com/index.php/IJECE/article/view/25232/15114
-
         Task C's prediction task is the one described in:
             https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL
+    =================
+    A conda environment will be created for each step where you do not see `@conda(disabled=True)`. 
+    Other steps will use the local conda environment built from ./conda-env.yml.
+    =================
     '''
 
-    @conda(disabled=True)
     @card
+    @conda(disabled=True)
     @step
     def start(self): 
         '''
@@ -36,6 +38,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         figure = plot_labels(labels = self.labels.value_counts().values, raw_data = raw_data)
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.featurize_and_split)
+
 
     @card
     @conda(disabled=True)
@@ -67,6 +70,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.correlation_based_feature_selection,
             self.info_gain_feature_selection)
 
+
     @conda(disabled=True)
     @step 
     def relief_based_feature_selection(self):
@@ -84,6 +88,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             rbfs.feature_importances_)}
         self.next(self.feature_importance_merge)
 
+
     @conda(disabled=True)
     @step 
     def correlation_based_feature_selection(self):
@@ -94,6 +99,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         feature_names, correlation_when_removed = cbfs(self.train_x_full, N=10)
         self.cbfs = {name:score for name, score in zip(feature_names, correlation_when_removed)}
         self.next(self.feature_importance_merge)
+
 
     @conda(disabled=True)
     @step 
@@ -108,6 +114,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.igfs = {name:score for name,score in zip(self.train_x_full.columns[idxs], 
             selector.scores_[idxs])}
         self.next(self.feature_importance_merge)
+
 
     @conda(disabled=True)
     @step
@@ -124,6 +131,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.merge_artifacts(inputs)
         self.next(self.classifiers_dag)
 
+
     @conda(disabled=True)
     @step
     def classifiers_dag(self):
@@ -131,6 +139,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.xgboost,
             self.neural_net,
             self.automl)
+
 
     @conda(disabled=True)
     @step 
@@ -145,6 +154,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.mlr_model, self.mlr_scores = fit_and_score_multiclass_model(LogisticRegression(**params), 
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
         self.next(self.visualize_model_scores)
+
 
     @conda(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
         "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
@@ -164,9 +174,11 @@ class FeatureSelectionAndClassification(FlowSpec):
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.visualize_model_scores)
 
-    #@batch(cpu=4)
-    @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12") 
-    @pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"})
+
+    @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
+    @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
+    @switch_compute(batch(cpu=4), all_local=os.getenv("ALL_LOCAL")) 
+    @switch_compute(pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"}), all_local=os.getenv("ALL_LOCAL"))
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
@@ -182,19 +194,22 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.validation_x_full.values.astype(np.float32), self.validation_y_full.values.astype(np.int64))
         self.next(self.visualize_model_scores)
 
-    #@batch(cpu=12)
+
+    @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
     @conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12")
+    @switch_compute(batch(cpu=4), all_local=os.getenv("ALL_LOCAL"))
     @step 
     def automl(self):
         '''tpot.TPOTClassifier'''
         from tpot import TPOTClassifier
         from flow_utilities import fit_and_score_multiclass_model
-        params = {"generations":20, "population_size":5, "cv":5, 
+        params = {"generations":5, "population_size":5, "cv":5, 
                   "random_state":Config.RANDOM_STATE, "verbosity":2}
         tpot_model, self.tpot_scores = fit_and_score_multiclass_model(TPOTClassifier(**params), 
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
         tpot_model.export(Config.TPOT_SCRIPT_DESTINATION)
         self.next(self.visualize_model_scores)
+
 
     @conda(disabled=True)
     @step
@@ -211,13 +226,16 @@ class FeatureSelectionAndClassification(FlowSpec):
         print(f"MLR: {inputs.multinomial_logistic_regression.mlr_scores}")
         print(f"XGBoost: {inputs.xgboost.xgb_scores}")
         print(f"Neural Net: {inputs.neural_net.nn_scores}")
+        print(f"TPOT: {inputs.automl.tpot_scores}")
         self.merge_artifacts(inputs)
         self.next(self.end)
+
 
     @conda(disabled=True)
     @step
     def end(self):
         pass
+
 
 if __name__ == "__main__":
     FeatureSelectionAndClassification()

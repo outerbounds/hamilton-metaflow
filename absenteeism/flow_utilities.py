@@ -1,3 +1,5 @@
+import functools
+
 class Config:
     RANDOM_STATE = 0
     RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
@@ -6,6 +8,13 @@ class Config:
     TPOT_SCRIPT_DESTINATION = "./tpot_optimized_pipeline.py"
     HAMILTON_VIZ_PATH = "./feature_dag"
     EXCLUDED_COLS = {'id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week'}
+
+
+def switch_compute(dec, all_local):
+    def decorator(func):
+        return dec(func) if not int(all_local) else func
+    return decorator
+
 
 def pip(libraries):
     from functools import wraps
@@ -66,8 +75,8 @@ def plot_labels(labels, raw_data):
 def hamilton_viz(dr, features_wanted):
     import matplotlib.pyplot as plt
     from PIL import Image
-    dr.visualize_execution(features_wanted,
-        output_file_path=Config.HAMILTON_VIZ_PATH, render_kwargs={'format': 'png'})
+    dr.visualize_execution(features_wanted, output_file_path=Config.HAMILTON_VIZ_PATH, 
+        render_kwargs=dict(format='png'), graphviz_kwargs=dict(graph_attr={'ratio': '1'}))
     img = Image.open(f'{Config.HAMILTON_VIZ_PATH}.png')
     fig = plt.figure(figsize=(20,4))
     ax = fig.add_subplot(111)
