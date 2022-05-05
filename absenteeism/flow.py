@@ -178,7 +178,7 @@ class FeatureSelectionAndClassification(FlowSpec):
     @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
     @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
     @switch_compute(batch(cpu=4), all_local=os.getenv("ALL_LOCAL")) 
-    @switch_compute(pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"}), all_local=os.getenv("ALL_LOCAL"))
+    @pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"})
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
