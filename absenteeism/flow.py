@@ -22,7 +22,7 @@ class FeatureSelectionAndClassification(FlowSpec):
     '''
 
     @card
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def start(self): 
         '''
@@ -41,7 +41,7 @@ class FeatureSelectionAndClassification(FlowSpec):
 
 
     @card
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def featurize_and_split(self):
         '''
@@ -59,10 +59,6 @@ class FeatureSelectionAndClassification(FlowSpec):
         features_wanted = [n.name for n in dr.list_available_variables()
                            if n.name not in Config.EXCLUDED_COLS and n.type == pd.Series]
         self.full_featurized_data = dr.execute(features_wanted)
-        # NOTE: Metaflow card's Image viewer forces everything into a square view.
-        # this makes card viewer somewhat ineffective for Hamilton DAG which is much wider than tall. 
-        # If we are feeling fancy and want to spend more hours on this we could 
-        # map hamilton.graph.FunctionGraph to a metaflow.cards.DAG type in cards/ui/src/types.js  
         current.card.append(Image.from_matplotlib(hamilton_viz(dr, features_wanted)))
         self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full = train_test_split(
             self.full_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
@@ -71,7 +67,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.info_gain_feature_selection)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def relief_based_feature_selection(self):
         '''
@@ -89,7 +85,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.feature_importance_merge)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def correlation_based_feature_selection(self):
         '''
@@ -101,7 +97,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.feature_importance_merge)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def info_gain_feature_selection(self):
         '''
@@ -116,7 +112,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.feature_importance_merge)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def feature_importance_merge(self, inputs):
         '''
@@ -132,7 +128,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.classifiers_dag)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def classifiers_dag(self):
         self.next(self.multinomial_logistic_regression, 
@@ -141,7 +137,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.automl)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def multinomial_logistic_regression(self):
         '''sklearn.linear_model.LogisticRegression models'''
@@ -155,9 +151,8 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
         self.next(self.visualize_model_scores)
 
-
-    @conda(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
-        "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
+    @switch_compute(conda(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
+        "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
     @card
     @step 
     def xgboost(self):
@@ -176,9 +171,11 @@ class FeatureSelectionAndClassification(FlowSpec):
 
 
     @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
-    @conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12")
-    @switch_compute(batch(cpu=4), all_local=os.getenv("ALL_LOCAL")) 
-    @pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"})
+    @switch_compute(conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", 
+        "pandas":"1.4.2"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
+    @switch_compute(batch(cpu=4), os.getenv("ALL_LOCAL")) 
+    @switch_compute(pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"}), 
+        os.getenv("ALL_LOCAL"))
     @step 
     def neural_net(self):
         '''fit torch model using skorch interface'''
@@ -196,8 +193,8 @@ class FeatureSelectionAndClassification(FlowSpec):
 
 
     @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
-    @conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12")
-    @switch_compute(batch(cpu=4), all_local=os.getenv("ALL_LOCAL"))
+    @switch_compute(conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
+    @switch_compute(batch(cpu=4), os.getenv("ALL_LOCAL"))
     @step 
     def automl(self):
         '''tpot.TPOTClassifier'''
@@ -211,7 +208,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.next(self.visualize_model_scores)
 
 
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def visualize_model_scores(self, inputs):
         '''
@@ -230,8 +227,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.merge_artifacts(inputs)
         self.next(self.end)
 
-
-    @conda(disabled=True)
+    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def end(self):
         pass
