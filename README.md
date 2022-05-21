@@ -2,8 +2,11 @@
 ```
 git clone https://github.com/outerbounds/hamilton-metaflow.git
 cd ./absenteeism
-conda env create -f ./conda-env.yml
-conda activate ham-flow
+```
+
+This flow depends on Metaflow's integration with Anaconda. You can [install conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html#installation) like: 
+```
+bash Miniconda3-latest-MacOSX-x86_64.sh
 ```
 
 ## Note about visualizing Hamilton flow
@@ -15,20 +18,16 @@ A recommended approach is to [install graphviz at system level](https://graphviz
 * More alternatives are discussed [here](https://stackoverflow.com/questions/35064304/runtimeerror-make-sure-the-graphviz-executables-are-on-your-systems-path-aft).
 
 # Run the flow
-To run locally: 
-```
-export ALL_LOCAL=1
-```
-
-To run steps decorated with `@batch` on AWS Batch:
-```
-export ALL_LOCAL=0
-```
-
 Run the flow:
 ```
 python ./flow.py --environment=conda run
 ```
+
+Note that after configuring AWS credentials you can run any steps on AWS Batch using Metaflows `@batch` decorator. You can configure AWS credentials by following the prompts after:
+```
+aws configure
+```
+
 # Inspecting Results
 This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser by running 
 ```
@@ -40,14 +39,17 @@ For example, the `start` step displays class label distribution plots:
 python ./flow.py card view start
 ```
 
-You can also look at the scores of each modeling step like: 
+You can see Hamilton visualizations by using
+```
+python ./flow.py card view featurize_and_split
+python ./flow.py card view feature_importance_merge
+```
+
+You can also look at the scores of each modeling step in a pandas DataFrame like: 
 ``` python 
 from metaflow import Flow
-flow_data = Flow('FeatureSelectionAndClassification').latest_run.data
-print(flow_data.mlr_scores)
-print(flow_data.xgb_scores)
-print(flow_data.nn_scores)
-print(flow_data.tpot_scores)
+run = Flow('FeatureSelectionAndClassification').latest_run
+run.data.results
 ```
 
 # Paper Reference

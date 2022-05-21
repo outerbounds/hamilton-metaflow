@@ -4,17 +4,12 @@ channels:
 dependencies:
   - python=3.9.12
   - pip=22.0.4
-  - pip:
-    - setuptools==57.5.0
-    - pandas==1.4.2
-    - sf-hamilton==1.7.0
-    - metaflow==2.5.4
-    - numpy==1.22.3
-    - scikit-learn==1.0.2
-    - skrebate==0.62
-    - matplotlib==3.5.1
-    - xgboost==1.6.0
-    - torch==1.11.0
-    - skorch==0.11.0
-    - tpot==0.11.7
-    - graphviz==0.20
+  - pandas=1.4.2
+  - sf-hamilton=1.7.0
+  - metaflow=2.6.1
+  - numpy=1.22.3
+  - scikit-learn=1.0.2
+  - skrebate=0.62
+  - matplotlib=3.5.1
+  - xgboost=1.5.1
+  - python-graphviz=0.8.4

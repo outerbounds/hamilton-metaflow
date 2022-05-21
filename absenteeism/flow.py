@@ -1,28 +1,27 @@
-from metaflow import FlowSpec, step, Parameter, card, current, conda, batch, environment
+from metaflow import FlowSpec, step, Parameter, card, current, conda_base, batch
 from metaflow.cards import Image
-from flow_utilities import Config, pip, switch_compute
 import os
 
+@conda_base(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
+                       "scikit-learn":"1.0.2", "pandas":"1.4.2",
+                       "sf-hamilton":"1.7.0", "numpy":"1.22.3",
+                       "skrebate":"0.62", "python-graphviz":"0.20"},
+            python="3.9.12")
 class FeatureSelectionAndClassification(FlowSpec):
 
     '''
-    =================
-    Flow description
-        task A: Featurize raw data using hamilton. A hamilton dag visualization will be stored in a Metaflow card.
-        task B: Compare and visualize feature selection methods. 
-        task C: Compare and visualize classification modeling approaches.
-        Task B's feature selection flow is inspired by section 3.2 of: 
-            http://ijece.iaescore.com/index.php/IJECE/article/view/25232/15114
-        Task C's prediction task is the one described in:
-            https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL
-    =================
-    A conda environment will be created for each step where you do not see `@conda(disabled=True)`. 
-    Other steps will use the local conda environment built from ./conda-env.yml.
-    =================
+    Flow description:
+        Featurize dataset using Hamilton
+        Run feature selection process (three branches)
+        Use policy (in `feature_importance_merge` step) to select top K features for subset
+        Branch on full dataset and top K feature subset dataset
+        Create MLR, XGBoost, Neural Net, ExtraTrees model for each dataset (4*2=8 models total)
+        Merge all modeling results in a dataframe that can be accessed using run.data.results.
     '''
 
+    number_of_subset_features = Parameter("number_of_subset_features", default=10) 
+
     @card
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def start(self): 
         '''
@@ -30,7 +29,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         '''
         import pandas as pd
         import numpy as np
-        from flow_utilities import plot_labels, encode_labels
+        from flow_utilities import plot_labels, encode_labels, Config
         raw_data = pd.read_csv(Config.RAW_DATA_LOCATION, sep=";")
         self.raw_data_features = raw_data.drop(columns=[Config.LABEL_COL_NAME])
         self.labels = raw_data[Config.LABEL_COL_NAME].apply(encode_labels)
@@ -39,9 +38,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.featurize_and_split)
 
-
     @card
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def featurize_and_split(self):
         '''
@@ -53,7 +50,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         import feature_logic
         import normalized_features
         from sklearn.model_selection import train_test_split
-        from flow_utilities import hamilton_viz
+        from flow_utilities import hamilton_viz, Config
         dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
         features_wanted = [n.name for n in dr.list_available_variables()
@@ -66,26 +63,20 @@ class FeatureSelectionAndClassification(FlowSpec):
             self.correlation_based_feature_selection,
             self.info_gain_feature_selection)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def relief_based_feature_selection(self):
         '''
         Compute feature importance based on RBFS weights.
         https://arxiv.org/abs/1711.08477
         '''
-        # TODO figure out how to use skrebate
         from skrebate import ReliefF
         import pandas as pd
         from copy import deepcopy
-        rbfs = ReliefF()
-        rbfs.fit(self.train_x_full.values, self.train_y_full.values)
-        self.rbfs = {name:score for name, score in zip(list(self.train_x_full.columns), 
-            rbfs.feature_importances_)}
+        self.rbfs = ReliefF()
+        self.rbfs.fit(self.train_x_full.values, self.train_y_full.values)
+        self.rbfs_scores = dict(zip(list(self.train_x_full.columns), self.rbfs.feature_importances_))
         self.next(self.feature_importance_merge)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def correlation_based_feature_selection(self):
         '''
@@ -93,11 +84,9 @@ class FeatureSelectionAndClassification(FlowSpec):
         '''
         from flow_utilities import cbfs
         feature_names, correlation_when_removed = cbfs(self.train_x_full, N=10)
-        self.cbfs = {name:score for name, score in zip(feature_names, correlation_when_removed)}
+        self.cbfs_scores = dict(zip(feature_names, correlation_when_removed))
         self.next(self.feature_importance_merge)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def info_gain_feature_selection(self):
         '''
@@ -107,131 +96,171 @@ class FeatureSelectionAndClassification(FlowSpec):
         selector = SelectKBest(mutual_info_classif, k=10)
         selected_features = selector.fit_transform(self.train_x_full, self.train_y_full)
         idxs = selector.get_support(indices=True)
-        self.igfs = {name:score for name,score in zip(self.train_x_full.columns[idxs], 
-            selector.scores_[idxs])}
+        self.igfs_scores = dict(zip(self.train_x_full.columns[idxs], selector.scores_[idxs]))
         self.next(self.feature_importance_merge)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
+    @card
     @step
     def feature_importance_merge(self, inputs):
         '''
-        Merge feature importance steps.
+        Merge feature importance steps. Select top k features.
         '''
-        # TODO: setup partial dataset flow based on feature selection policy that merges above results.
+        import pandas as pd
+        from hamilton import driver
+        import data_loader
+        import feature_logic
+        import normalized_features
+        from sklearn.model_selection import train_test_split
+        from flow_utilities import hamilton_viz, Config
+        import numpy as np
+
         # resolve ambiguity for metaflow join step, can choose any of feature selection steps
         self.train_x_full = inputs.relief_based_feature_selection.train_x_full
         self.validation_x_full = inputs.relief_based_feature_selection.validation_x_full
         self.train_y_full = inputs.relief_based_feature_selection.train_y_full
         self.validation_y_full = inputs.relief_based_feature_selection.validation_y_full
         self.merge_artifacts(inputs)
-        self.next(self.classifiers_dag)
 
+        # find top k features
+        top_k_idxs = self.rbfs.top_features_[:self.number_of_subset_features] # policy: use top k according to RBFS
+        top_k_features = np.array(list(self.rbfs_scores.keys()))[[top_k_idxs]]
+        top_k_importance_values = np.array(list(self.rbfs_scores.values()))[[top_k_idxs]]
 
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
+        # use Hamilton to select top k features
+        dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
+                           data_loader, feature_logic, normalized_features)
+        self.select_featurized_data = dr.execute(top_k_features)
+        current.card.append(Image.from_matplotlib(hamilton_viz(dr, top_k_features, feature_set="selected")))
+        self.train_x_select, self.validation_x_select, self.train_y_select, self.validation_y_select = train_test_split(
+            self.select_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
+        self.next(self.dataset_split)
+
+    @step
+    def dataset_split(self):
+        '''create two branches for the full dataset features and the top K features dataset'''
+        self.data_split = [
+            (self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full, "full"),
+            (self.train_x_select, self.validation_x_select, self.train_y_select, self.validation_y_select, "selected")
+        ]
+        self.next(self.classifiers_dag, foreach="data_split")
+
     @step
     def classifiers_dag(self):
+        self.train_x = self.input[0]
+        self.valid_x = self.input[1]
+        self.train_y = self.input[2]
+        self.valid_y = self.input[3]
+        self.dataset_name = self.input[4]
         self.next(self.multinomial_logistic_regression, 
             self.xgboost,
             self.neural_net,
-            self.automl)
+            self.extra_trees)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step 
     def multinomial_logistic_regression(self):
-        '''sklearn.linear_model.LogisticRegression models'''
-        # TODO: tune params
+        '''Fit and score sklearn.linear_model.LogisticRegression models'''
         from sklearn.linear_model import LogisticRegression
         from time import time
-        from flow_utilities import fit_and_score_multiclass_model
+        from flow_utilities import fit_and_score_multiclass_model, Config
+        self.model_name = "Multinomial Logistic Regression"
         params = {"penalty": "l2", "solver":"lbfgs", "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "multi_class": "multinomial"}
-        self.mlr_model, self.mlr_scores = fit_and_score_multiclass_model(LogisticRegression(**params), 
-            self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
-        self.next(self.visualize_model_scores)
+        self.model, self.scores = fit_and_score_multiclass_model(
+            LogisticRegression(**params), 
+            self.train_x, self.train_y, self.valid_x, self.valid_y
+        )
+        self.params = params
+        self.next(self.gather_model_scores)
 
-    @switch_compute(conda(libraries={"xgboost":"1.5.1", "matplotlib":"3.5.1", 
-        "scikit-learn":"1.0.2", "pandas":"1.4.2"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
     @card
     @step 
     def xgboost(self):
-        '''xgboost.XGBClassifier models'''
-        # TODO: tune params
+        '''Fit and score xgboost.XGBClassifier models'''
         from xgboost import XGBClassifier
         import matplotlib.pyplot as plt
-        from flow_utilities import fit_and_score_multiclass_model, plot_xgb_importances
+        from flow_utilities import fit_and_score_multiclass_model, plot_xgb_importances, Config
+        self.model_name = "XGBoost"
         params = {"n_estimators": 1000, "max_depth":10, "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "learning_rate": .1, "objective": "multi:softmax"}
-        self.xgb_model, self.xgb_scores = fit_and_score_multiclass_model(XGBClassifier(**params), 
-            self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
-        figure = plot_xgb_importances(self.xgb_model)
+        self.model, self.scores = fit_and_score_multiclass_model(
+            XGBClassifier(**params), 
+            self.train_x, self.train_y, self.valid_x, self.valid_y
+        )
+        self.params = params
+        figure = plot_xgb_importances(self.model)
         current.card.append(Image.from_matplotlib(figure))
-        self.next(self.visualize_model_scores)
+        self.next(self.gather_model_scores)
 
-
-    @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
-    @switch_compute(conda(libraries={"pip":"22.0.4", "scikit-learn":"1.0.2", 
-        "pandas":"1.4.2"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
-    @switch_compute(batch(cpu=4), os.getenv("ALL_LOCAL")) 
-    @switch_compute(pip(libraries={"torch":"1.11.0", "skorch":"0.11.0"}), 
-        os.getenv("ALL_LOCAL"))
+    @batch(cpu=2)
     @step 
     def neural_net(self):
-        '''fit torch model using skorch interface'''
-        # TODO: tune params (in flow_utilities.py)
-        from skorch import NeuralNetClassifier
-        import numpy as np
-        from flow_utilities import fit_and_score_multiclass_model
-        from torch_model import SkorchModule
-        params = {"module": SkorchModule(num_input_feats=self.train_x_full.shape[1]), 
-            "max_epochs":10, "lr":0.1, "iterator_train__shuffle": True, "verbose":0}
-        self.nn_model, self.nn_scores = fit_and_score_multiclass_model(NeuralNetClassifier(**params), 
-            self.train_x_full.values.astype(np.float32), self.train_y_full.values.astype(np.int64), 
-            self.validation_x_full.values.astype(np.float32), self.validation_y_full.values.astype(np.int64))
-        self.next(self.visualize_model_scores)
+        '''Fit and score neural network'''
+        from sklearn.neural_network import MLPClassifier
+        from flow_utilities import fit_and_score_multiclass_model, Config
+        self.model_name = "Neural Network"
+        params = {"learning_rate_init": 0.01, "learning_rate": "adaptive", 
+                  "hidden_layer_sizes": 50, "random_state": Config.RANDOM_STATE}
+        self.model, self.scores = fit_and_score_multiclass_model(
+            MLPClassifier(**params),
+            self.train_x, self.train_y, self.valid_x, self.valid_y
+        )
+        self.params = params
+        self.next(self.gather_model_scores)
 
-
-    @environment(vars={"ALL_LOCAL": os.getenv("ALL_LOCAL")})
-    @switch_compute(conda(libraries={"tpot-full":"0.11.7"}, python="3.9.12"), os.getenv("ALL_LOCAL"))
-    @switch_compute(batch(cpu=4), os.getenv("ALL_LOCAL"))
     @step 
-    def automl(self):
-        '''tpot.TPOTClassifier'''
-        from tpot import TPOTClassifier
-        from flow_utilities import fit_and_score_multiclass_model
-        params = {"generations":5, "population_size":5, "cv":5, 
-                  "random_state":Config.RANDOM_STATE, "verbosity":2}
-        tpot_model, self.tpot_scores = fit_and_score_multiclass_model(TPOTClassifier(**params), 
-            self.train_x_full, self.train_y_full, self.validation_x_full, self.validation_y_full)
-        tpot_model.export(Config.TPOT_SCRIPT_DESTINATION)
-        self.next(self.visualize_model_scores)
+    def extra_trees(self):
+        '''Fit and score extra trees model'''
+        from sklearn.ensemble import ExtraTreesClassifier
+        from flow_utilities import fit_and_score_multiclass_model, Config
+        self.model_name = "ExtraTrees"
+        params = {"criterion": "gini", "max_depth": 8, "random_state": Config.RANDOM_STATE}
+        self.model, self.scores = fit_and_score_multiclass_model(
+            ExtraTreesClassifier(**params), 
+            self.train_x, self.train_y, self.valid_x, self.valid_y
+        )
+        self.params = params
+        self.next(self.gather_model_scores)
 
-
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
-    def visualize_model_scores(self, inputs):
-        '''
-        Produce metaflow card to view model performance results in.
-        Result Dimensions to Display
-            Flow Step
-            Model Type
-            Metric scores: accuracy, precision, recall, roc, training time, prediction time.
-            Full Feature Set vs. Subset performance
-        TODO: consider addign model interpretability libraries (e.g., LIME, Shap).
-        '''
-        print(f"MLR: {inputs.multinomial_logistic_regression.mlr_scores}")
-        print(f"XGBoost: {inputs.xgboost.xgb_scores}")
-        print(f"Neural Net: {inputs.neural_net.nn_scores}")
-        print(f"TPOT: {inputs.automl.tpot_scores}")
-        self.merge_artifacts(inputs)
+    def gather_model_scores(self, inputs):
+        '''for each model, gather configuration and metric scores'''
+        import pandas as pd
+        import json
+        results = { 
+            "model name": [],
+            "model params": [],
+            "dataset name": []
+        }
+        metrics = {
+            "accuracy": [], 
+            "macro-weighted precision": [],
+            "macro-weighted recall": [],
+            "macro-weighted f1": [],
+            "training time": [],
+            "prediction time": []
+        }
+        for modeling_step in inputs:
+            results['model name'].append(modeling_step.model_name)
+            results['model params'].append(json.dumps(modeling_step.params))
+            results['dataset name'].append(modeling_step.dataset_name)
+            for metric_name in metrics.keys():
+                metrics[metric_name].append(modeling_step.scores[metric_name])
+        results |= metrics
+        self.results_df = pd.DataFrame(results)
+        self.next(self.gather_across_datasets)
+
+    @step
+    def gather_across_datasets(self, inputs):
+        '''merge results dataframes from `gather_model_scores` for each dataset split'''
+        import pandas as pd
+        self.results = pd.DataFrame()
+        for dataset_split in inputs:
+            self.results = pd.concat([self.results, dataset_split.results_df], axis=0)
         self.next(self.end)
 
-    @switch_compute(conda(disabled=True), os.getenv("ALL_LOCAL"))
     @step
     def end(self):
-        pass
-
+        print("FeatureSelectionAndClassification flow is complete!")
 
 if __name__ == "__main__":
     FeatureSelectionAndClassification()

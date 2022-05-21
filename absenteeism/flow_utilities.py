@@ -1,5 +1,3 @@
-import functools
-
 class Config:
     RANDOM_STATE = 0
     RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
@@ -8,30 +6,6 @@ class Config:
     TPOT_SCRIPT_DESTINATION = "./tpot_optimized_pipeline.py"
     HAMILTON_VIZ_PATH = "./feature_dag"
     EXCLUDED_COLS = {'id', 'reason_for_absence', 'month_of_absence', 'day_of_the_week'}
-
-
-def switch_compute(dec, all_local):
-    def decorator(func):
-        return dec(func) if not int(all_local) else func
-    return decorator
-
-
-def pip(libraries):
-    from functools import wraps
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            import subprocess
-            import sys
-            for library, version in libraries.items():
-                print("installing:", library, version)
-                if version != "":
-                    subprocess.run([sys.executable, "-m", "pip", "install", library + "==" + version])
-                else:
-                    subprocess.run([sys.executable, "-m", "pip", "install", library])
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
 
 
 def encode_labels(x):
@@ -46,7 +20,7 @@ def encode_labels(x):
     elif 16 <= x <= 120:
         return 2
     else: 
-        raise ValueError(f"Data point with > 120 hours of absenteeism does not fit label encoding.")
+        raise ValueError(f"Data point with > 120 hours of absenteeism does not fit label encoding scheme.")
 
 
 def plot_labels(labels, raw_data):
@@ -72,12 +46,13 @@ def plot_labels(labels, raw_data):
     return figure
 
 
-def hamilton_viz(dr, features_wanted):
+def hamilton_viz(dr, features_wanted, feature_set="full"):
     import matplotlib.pyplot as plt
     from PIL import Image
-    dr.visualize_execution(features_wanted, output_file_path=Config.HAMILTON_VIZ_PATH, 
+    path = f"{Config.HAMILTON_VIZ_PATH}_{feature_set}"
+    dr.visualize_execution(features_wanted, output_file_path=path, 
         render_kwargs=dict(format='png'), graphviz_kwargs=dict(graph_attr={'ratio': '1'}))
-    img = Image.open(f'{Config.HAMILTON_VIZ_PATH}.png')
+    img = Image.open(f'{path}.png')
     fig = plt.figure(figsize=(20,4))
     ax = fig.add_subplot(111)
     ax.imshow(img)
@@ -132,7 +107,6 @@ def fit_and_score_multiclass_model(model, train_x, train_y, valid_x, valid_y):
     tf_valid = time()
     return model, {
         "accuracy": accuracy_score(valid_y, preds),
-        # Note: micro f1 is same as accuracy it class > 2 setting
         "macro-weighted precision": precision_score(valid_y, preds, average="macro"),
         "macro-weighted recall": recall_score(valid_y, preds, average="macro"),
         "macro-weighted f1": f1_score(valid_y, preds, average="macro"),
