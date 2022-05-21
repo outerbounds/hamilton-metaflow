@@ -11,8 +11,9 @@ bash Miniconda3-latest-MacOSX-x86_64.sh
 
 ## Note about visualizing Hamilton flow
 In the `flow.py` step called `featurize_and_split` the code is configured to visualize the hamilton DAG.
-To run this you need to have graphviz on your system PATH. 
-A recommended approach is to [install graphviz at system level](https://graphviz.org/download/). 
+By default, we assume you have system graphviz installed. 
+If you do not have graphviz or don't want to use it you can set the `graphviz_flag` parameter defined in `flow.py` to `false`. 
+If you want to visualize the hamilton DAGs in Metaflow Cards here is a link to the recommended approach to [install graphviz at system level](https://graphviz.org/download/). 
 * On MacOS: `brew install graphviz`
 * On Unix: `sudo apt-get install graphviz`
 * More alternatives are discussed [here](https://stackoverflow.com/questions/35064304/runtimeerror-make-sure-the-graphviz-executables-are-on-your-systems-path-aft).
