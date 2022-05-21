@@ -20,6 +20,7 @@ class FeatureSelectionAndClassification(FlowSpec):
     '''
 
     number_of_subset_features = Parameter("number_of_subset_features", default=10) 
+    graphviz_flag = Parameter("graphviz_flag", default=True) # true if system graphviz is installed 
 
     @card
     @step
@@ -56,7 +57,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         features_wanted = [n.name for n in dr.list_available_variables()
                            if n.name not in Config.EXCLUDED_COLS and n.type == pd.Series]
         self.full_featurized_data = dr.execute(features_wanted)
-        current.card.append(Image.from_matplotlib(hamilton_viz(dr, features_wanted)))
+        if self.graphviz_flag:
+            current.card.append(Image.from_matplotlib(hamilton_viz(dr, features_wanted)))
         self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full = train_test_split(
             self.full_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
         self.next(self.relief_based_feature_selection, 
@@ -71,7 +73,6 @@ class FeatureSelectionAndClassification(FlowSpec):
         '''
         from skrebate import ReliefF
         import pandas as pd
-        from copy import deepcopy
         self.rbfs = ReliefF()
         self.rbfs.fit(self.train_x_full.values, self.train_y_full.values)
         self.rbfs_scores = dict(zip(list(self.train_x_full.columns), self.rbfs.feature_importances_))
@@ -130,7 +131,8 @@ class FeatureSelectionAndClassification(FlowSpec):
         dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
         self.select_featurized_data = dr.execute(top_k_features)
-        current.card.append(Image.from_matplotlib(hamilton_viz(dr, top_k_features, feature_set="selected")))
+        if self.graphviz_flag:
+            current.card.append(Image.from_matplotlib(hamilton_viz(dr, top_k_features, feature_set="selected")))
         self.train_x_select, self.validation_x_select, self.train_y_select, self.validation_y_select = train_test_split(
             self.select_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
         self.next(self.dataset_split)
@@ -160,7 +162,6 @@ class FeatureSelectionAndClassification(FlowSpec):
     def multinomial_logistic_regression(self):
         '''Fit and score sklearn.linear_model.LogisticRegression models'''
         from sklearn.linear_model import LogisticRegression
-        from time import time
         from flow_utilities import fit_and_score_multiclass_model, Config
         self.model_name = "Multinomial Logistic Regression"
         params = {"penalty": "l2", "solver":"lbfgs", "random_state": Config.RANDOM_STATE,
@@ -191,7 +192,6 @@ class FeatureSelectionAndClassification(FlowSpec):
         current.card.append(Image.from_matplotlib(figure))
         self.next(self.gather_model_scores)
 
-    @batch(cpu=2)
     @step 
     def neural_net(self):
         '''Fit and score neural network'''
