@@ -52,15 +52,24 @@ class FeatureSelectionAndClassification(FlowSpec):
         import normalized_features
         from sklearn.model_selection import train_test_split
         from flow_utilities import hamilton_viz, Config
+
+        # create Hamilton driver and DAG
+            # first argument is where the config file is
+            # second row of arguments are python dependencies for hamilton
+            # Checkout what is in those files and compare to the images that appear from this step when running the flow.
         dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
         features_wanted = [n.name for n in dr.list_available_variables()
                            if n.name not in Config.EXCLUDED_COLS and n.type == pd.Series]
         self.full_featurized_data = dr.execute(features_wanted)
+
+        # This is a part you need graphviz for. Leave this flag off if you don't have graphviz.
         if self.graphviz_flag:
             current.card.append(Image.from_matplotlib(hamilton_viz(dr, features_wanted)))
+
         self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full = train_test_split(
             self.full_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
+
         self.next(self.relief_based_feature_selection, 
             self.correlation_based_feature_selection,
             self.info_gain_feature_selection)
@@ -115,31 +124,35 @@ class FeatureSelectionAndClassification(FlowSpec):
         from flow_utilities import hamilton_viz, Config
         import numpy as np
 
-        # resolve ambiguity for metaflow join step, can choose any of feature selection steps
+        # Resolve ambiguity for metaflow join step, data from prior steps is the same.
         self.train_x_full = inputs.relief_based_feature_selection.train_x_full
         self.validation_x_full = inputs.relief_based_feature_selection.validation_x_full
         self.train_y_full = inputs.relief_based_feature_selection.train_y_full
         self.validation_y_full = inputs.relief_based_feature_selection.validation_y_full
         self.merge_artifacts(inputs)
 
-        # find top k features
-        top_k_idxs = self.rbfs.top_features_[:self.number_of_subset_features] # policy: use top k according to RBFS
+        # Find top k features.
+        top_k_idxs = self.rbfs.top_features_[:self.number_of_subset_features] # policy: Use top k according to RBFS.
         top_k_features = np.array(list(self.rbfs_scores.keys()))[[top_k_idxs]]
         top_k_importance_values = np.array(list(self.rbfs_scores.values()))[[top_k_idxs]]
 
-        # use Hamilton to select top k features
+        # Use Hamilton to select top k features.
         dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
         self.select_featurized_data = dr.execute(top_k_features)
+
+        # This is a part you need graphviz for. Leave this flag off if you don't have graphviz.
         if self.graphviz_flag:
             current.card.append(Image.from_matplotlib(hamilton_viz(dr, top_k_features, feature_set="selected")))
+
         self.train_x_select, self.validation_x_select, self.train_y_select, self.validation_y_select = train_test_split(
             self.select_featurized_data, self.labels, test_size=0.2, random_state=Config.RANDOM_STATE)
+
         self.next(self.dataset_split)
 
     @step
     def dataset_split(self):
-        '''create two branches for the full dataset features and the top K features dataset'''
+        '''Create two branches for the full (width) dataset and the top K features dataset.'''
         self.data_split = [
             (self.train_x_full, self.validation_x_full, self.train_y_full, self.validation_y_full, "full"),
             (self.train_x_select, self.validation_x_select, self.train_y_select, self.validation_y_select, "selected")
@@ -154,15 +167,17 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.valid_y = self.input[3]
         self.dataset_name = self.input[4]
         self.next(self.multinomial_logistic_regression, 
-            self.xgboost,
-            self.neural_net,
-            self.extra_trees)
+                  self.xgboost,
+                  self.neural_net,
+                  self.extra_trees)
 
     @step 
     def multinomial_logistic_regression(self):
-        '''Fit and score sklearn.linear_model.LogisticRegression models'''
+        '''Fit and score sklearn.linear_model.LogisticRegression models.'''
         from sklearn.linear_model import LogisticRegression
         from flow_utilities import fit_and_score_multiclass_model, Config
+        import numpy as np
+
         self.model_name = "Multinomial Logistic Regression"
         params = {"penalty": "l2", "solver":"lbfgs", "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "multi_class": "multinomial"}
@@ -176,62 +191,76 @@ class FeatureSelectionAndClassification(FlowSpec):
     @card
     @step 
     def xgboost(self):
-        '''Fit and score xgboost.XGBClassifier models'''
+        '''Fit and score xgboost.XGBClassifier models.'''
         from xgboost import XGBClassifier
         import matplotlib.pyplot as plt
         from flow_utilities import fit_and_score_multiclass_model, plot_xgb_importances, Config
+
         self.model_name = "XGBoost"
+
         params = {"n_estimators": 1000, "max_depth":10, "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "learning_rate": .1, "objective": "multi:softmax"}
+
         self.model, self.scores = fit_and_score_multiclass_model(
             XGBClassifier(**params), 
             self.train_x, self.train_y, self.valid_x, self.valid_y
         )
-        self.params = params
+
         figure = plot_xgb_importances(self.model)
         current.card.append(Image.from_matplotlib(figure))
+        
+        self.params = params
         self.next(self.gather_model_scores)
 
     @step 
     def neural_net(self):
-        '''Fit and score neural network'''
+        '''Fit and score neural network.'''
         from sklearn.neural_network import MLPClassifier
         from flow_utilities import fit_and_score_multiclass_model, Config
+
         self.model_name = "Neural Network"
         params = {"learning_rate_init": 0.01, "learning_rate": "adaptive", 
                   "hidden_layer_sizes": 50, "random_state": Config.RANDOM_STATE}
+
         self.model, self.scores = fit_and_score_multiclass_model(
             MLPClassifier(**params),
             self.train_x, self.train_y, self.valid_x, self.valid_y
         )
         self.params = params
+        self.scores["lime score"] = None
         self.next(self.gather_model_scores)
 
     @step 
     def extra_trees(self):
-        '''Fit and score extra trees model'''
+        '''Fit and score extra trees model.'''
         from sklearn.ensemble import ExtraTreesClassifier
         from flow_utilities import fit_and_score_multiclass_model, Config
+
         self.model_name = "ExtraTrees"
         params = {"criterion": "gini", "max_depth": 8, "random_state": Config.RANDOM_STATE}
+
         self.model, self.scores = fit_and_score_multiclass_model(
             ExtraTreesClassifier(**params), 
             self.train_x, self.train_y, self.valid_x, self.valid_y
         )
+
         self.params = params
         self.next(self.gather_model_scores)
 
     @step
-    def gather_model_scores(self, inputs):
-        '''for each model, gather configuration and metric scores'''
+    def gather_model_scores(self, models):
+        '''For each model, gather configuration and metric scores.'''
         import pandas as pd
         import json
+
         results = { 
             "model name": [],
             "model params": [],
             "dataset name": []
         }
-        metrics = {
+
+        # Tracked in self.metric_results at end of flow.
+        model_metrics = {
             "accuracy": [], 
             "macro-weighted precision": [],
             "macro-weighted recall": [],
@@ -239,23 +268,29 @@ class FeatureSelectionAndClassification(FlowSpec):
             "training time": [],
             "prediction time": []
         }
-        for modeling_step in inputs:
-            results['model name'].append(modeling_step.model_name)
-            results['model params'].append(json.dumps(modeling_step.params))
-            results['dataset name'].append(modeling_step.dataset_name)
-            for metric_name in metrics.keys():
-                metrics[metric_name].append(modeling_step.scores[metric_name])
-        results |= metrics
+
+        for modeling_step in models:
+
+            results["model name"].append(modeling_step.model_name)
+            results["model params"].append(json.dumps(modeling_step.params))
+            results["dataset name"].append(modeling_step.dataset_name)
+
+            for metric_name in model_metrics.keys():
+                model_metrics[metric_name].append(modeling_step.scores[metric_name])
+
+        results |= model_metrics
         self.results_df = pd.DataFrame(results)
         self.next(self.gather_across_datasets)
 
     @step
-    def gather_across_datasets(self, inputs):
-        '''merge results dataframes from `gather_model_scores` for each dataset split'''
+    def gather_across_datasets(self, datasets):
+        '''Merge results dataframes from `gather_model_scores` for each dataset split.'''
+
         import pandas as pd
-        self.results = pd.DataFrame()
-        for dataset_split in inputs:
-            self.results = pd.concat([self.results, dataset_split.results_df], axis=0)
+        self.metric_results = pd.DataFrame()
+        for dataset in datasets:
+            self.metric_results = pd.concat([self.metric_results, 
+                dataset.results_df], axis=0)
         self.next(self.end)
 
     @step
