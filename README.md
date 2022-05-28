@@ -33,21 +33,21 @@ This is one benefit of using Metaflow's `@conda` or `@conda_base decorators`. Me
 # Inspecting Results
 This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser running 
 ```
-python ./flow.py card view <step name>
+python ./flow.py --environment=conda card view <step name>
 ```
 
 For example, the `start` step displays class label distribution plots:
 ```
-python ./flow.py card view start
+python ./flow.py --environment=conda card view start
 ```
 
 You can see Hamilton visualizations by using
 ```
-python ./flow.py card view featurize_and_split
-python ./flow.py card view feature_importance_merge
+python ./flow.py --environment=conda card view featurize_and_split
+python ./flow.py --environment=conda card view feature_importance_merge
 ```
 
-You can also look at the scores of each modeling step in a pandas DataFrame like: 
+In a script or notebook you can also look at the scores of each modeling step in a pandas DataFrame like: 
 ``` python 
 from metaflow import Flow
 run = Flow('FeatureSelectionAndClassification').latest_run
