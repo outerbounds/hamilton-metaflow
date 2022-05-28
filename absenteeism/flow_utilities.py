@@ -1,4 +1,7 @@
 class Config:
+    '''
+    Data class defining configuration variables. 
+    '''
     RANDOM_STATE = 0
     RAW_DATA_LOCATION = "./data/Absenteeism_at_work.csv"
     LABEL_COL_NAME = "Absenteeism time in hours"
@@ -24,6 +27,9 @@ def encode_labels(x):
 
 
 def plot_labels(labels, raw_data):
+    '''
+    Plot original dataset labels and bucketing strategy for classification task.
+    '''
     import matplotlib.pyplot as plt
     import numpy as np
     figure = plt.figure(figsize=(16,6))
@@ -47,6 +53,9 @@ def plot_labels(labels, raw_data):
 
 
 def hamilton_viz(dr, features_wanted, feature_set="full"):
+    '''
+    Create matplotlib figure using Hamilton DAG visualization. 
+    '''
     import matplotlib.pyplot as plt
     from PIL import Image
     path = f"{Config.HAMILTON_VIZ_PATH}_{feature_set}"
@@ -62,7 +71,7 @@ def hamilton_viz(dr, features_wanted, feature_set="full"):
 
 def cbfs(features, N=15):
     '''
-    simplified version of:
+    Simplified version of correlation-based feature selection strategy defined in:
         https://www.hindawi.com/journals/complexity/2018/2520706/    
     '''
     fj_colname = features.corr().abs().mean().idxmin()
@@ -79,6 +88,9 @@ def cbfs(features, N=15):
         
 
 def plot_xgb_importances(booster):
+    '''
+    Plot `weight` and `gain` type of XGBoost feature importances on same figure. 
+    '''
     import matplotlib.pyplot as plt
     from xgboost import plot_importance
     figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(20,16))
@@ -97,6 +109,9 @@ def plot_xgb_importances(booster):
 
 
 def fit_and_score_multiclass_model(model, train_x, train_y, valid_x, valid_y):
+    '''
+    Take in a model as a scikit-learn estimator and return metric scores. 
+    '''
     from time import time
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
     t0_train = time()
