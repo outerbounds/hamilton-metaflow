@@ -15,7 +15,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         Run feature selection process (three branches)
         Use policy (in `feature_importance_merge` step) to select top K features for subset
         Branch on full dataset and top K feature subset dataset
-        Create MLR, XGBoost, Neural Net, ExtraTrees model for each dataset (4*2=8 models total)
+        Create MLR, XGBoost, Neural Net, ExtraTrees model for each dataset (4 models * 2 datasets = 8 models total)
         Merge all modeling results in a dataframe that can be accessed using run.data.results.
     '''
 
@@ -181,10 +181,12 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.model_name = "Multinomial Logistic Regression"
         params = {"penalty": "l2", "solver":"lbfgs", "random_state": Config.RANDOM_STATE,
                   "n_jobs": 1, "multi_class": "multinomial"}
+
         self.model, self.scores = fit_and_score_multiclass_model(
             LogisticRegression(**params), 
             self.train_x, self.train_y, self.valid_x, self.valid_y
         )
+
         self.params = params
         self.next(self.gather_model_scores)
 
@@ -226,6 +228,7 @@ class FeatureSelectionAndClassification(FlowSpec):
             MLPClassifier(**params),
             self.train_x, self.train_y, self.valid_x, self.valid_y
         )
+
         self.params = params
         self.scores["lime score"] = None
         self.next(self.gather_model_scores)
@@ -290,7 +293,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         self.metric_results = pd.DataFrame()
         for dataset in datasets:
             self.metric_results = pd.concat([self.metric_results, 
-                dataset.results_df], axis=0)
+                                             dataset.results_df], axis=0)
         self.next(self.end)
 
     @step
