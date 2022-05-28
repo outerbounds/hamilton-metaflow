@@ -54,8 +54,8 @@ run.data.results
 ```
 
 # Reference
-* [Application of a neuro fuzzy network in prediction of absenteeism at work](https://ieeexplore.ieee.org/document/6263151)
-* [Prediction Of Absenteeism At Work With Multinomial Logistic Regression Model](https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL)
+* Dataset source: [Application of a neuro fuzzy network in prediction of absenteeism at work](https://ieeexplore.ieee.org/document/6263151)
+* Learning task source: [Prediction Of Absenteeism At Work With Multinomial Logistic Regression Model](https://www.researchgate.net/publication/358900589_PREDICTION_OF_ABSENTEEISM_AT_WORK_WITH_MULTINOMIAL_LOGISTIC_REGRESSION_MODEL)
 * [Identification of Important Features and Data Mining Classification Techniques in Predicting Employee  Absenteeism at Work](http://ijece.iaescore.com/index.php/IJECE/article/view/25232)
 
 # Dataset reference
