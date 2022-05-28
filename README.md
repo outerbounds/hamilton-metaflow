@@ -24,6 +24,8 @@ Run the flow:
 python ./flow.py --environment=conda run
 ```
 
+Note that this will create a single conda environment to run each step of the flow in. The first time you do this it may take a several minutes to fetch all dependencies from conda, but each time after that the environment will bootstrap much faster so long as the conda dependencies are unchanged.
+
 After configuring your AWS credentials you can run any steps on AWS Batch using [Metaflow decorators](https://docs.metaflow.org/v/r/metaflow/scaling).
 
 # Inspecting Results
