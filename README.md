@@ -24,9 +24,11 @@ Run the flow:
 python ./flow.py --environment=conda run
 ```
 
-Note that this will create a single conda environment to run each step of the flow in. The first time you do this it may take a several minutes to fetch all dependencies from conda, but each time after that the environment will bootstrap much faster so long as the conda dependencies are unchanged.
+Note that this will create a single conda environment to run each step of the flow in. The first time you do this it may take several minutes to fetch all dependencies from conda, but each time after the environment will bootstrap much faster so long as the conda dependencies are unchanged.
 
 After configuring your AWS credentials you can run any steps on AWS Batch using [Metaflow decorators](https://docs.metaflow.org/v/r/metaflow/scaling).
+
+This is one benefit of using Metaflow's `@conda` or `@conda_base decorators`. Metaflow will automatically package the conda environment and start the compute environment on remote enviroments from it. 
 
 # Inspecting Results
 This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser running 
