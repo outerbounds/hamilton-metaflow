@@ -24,10 +24,7 @@ Run the flow:
 python ./flow.py --environment=conda run
 ```
 
-After configuring your AWS credentials you can run any steps on AWS Batch using Metaflow's `@batch` decorator. You can configure AWS credentials by following the prompts after:
-```
-aws configure
-```
+After configuring your AWS credentials you can run any steps on AWS Batch using [Metaflow decorators](https://docs.metaflow.org/v/r/metaflow/scaling).
 
 # Inspecting Results
 This flow creates several Metaflow [cards](https://docs.metaflow.org/metaflow/visualizing-results/effortless-task-inspection-with-default-cards). Cards are associated with flow steps. These can be viewed locally in the browser running 
