@@ -136,7 +136,7 @@ class FeatureSelectionAndClassification(FlowSpec):
         top_k_features = np.array(list(self.rbfs_scores.keys()))[[top_k_idxs]]
         top_k_importance_values = np.array(list(self.rbfs_scores.values()))[[top_k_idxs]]
 
-        # Use Hamilton to select top k features.
+        # Use Hamilton to select top k features. Same Driver config as earlier step.
         dr = driver.Driver({"location": Config.RAW_FEATURES_LOCATION},
                            data_loader, feature_logic, normalized_features)
         self.select_featurized_data = dr.execute(top_k_features)
@@ -290,10 +290,9 @@ class FeatureSelectionAndClassification(FlowSpec):
         '''Merge results dataframes from `gather_model_scores` for each dataset split.'''
 
         import pandas as pd
-        self.metric_results = pd.DataFrame()
+        self.results = pd.DataFrame()
         for dataset in datasets:
-            self.metric_results = pd.concat([self.metric_results, 
-                                             dataset.results_df], axis=0)
+            self.results = pd.concat([self.results, dataset.results_df], axis=0)
         self.next(self.end)
 
     @step
