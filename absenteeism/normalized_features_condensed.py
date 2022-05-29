@@ -6,15 +6,16 @@ Why might you use this approach?
 
 - you and the people going to be reading your code are quite familiar with python.
 - e.g. you understand python comprehensions & what ** does.
-- you want less code to manage and update when thigns change
+- you want less code to manage and less to update when things change.
 
 What is the cost?
 
 - it's less obvious to a new user to the code base, how a particular feature was produced.
-- it's a little harder to map & debug outputs to where the code lives to create that output.
+- it's a little harder to map & debug outputs to where the code lives which defines that output.
 
 So you should determine whether writing feature like this is right for you, depending on 
-your environment (who is going to own & modify the code after you write it!). 
+your environment (who is going to own & modify the code after you write it!). Our suggestions is to 
+compare this file with normalized_features.py and ask yourself which one would you rather maintain?
 """
 
 from hamilton.function_modifiers import parameterized_inputs
