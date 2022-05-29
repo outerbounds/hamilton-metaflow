@@ -1,3 +1,22 @@
+"""
+This modules shows a "super user" way to write the same features found in normalized_features.py.
+It utilizes some Hamilton function decorators to write less code that is more dense.
+
+Why might you use this approach?
+
+- you and the people going to be reading your code are quite familiar with python.
+- e.g. you understand python comprehensions & what ** does.
+- you want less code to manage and update when thigns change
+
+What is the cost?
+
+- it's less obvious to a new user to the code base, how a particular feature was produced.
+- it's a little harder to map & debug outputs to where the code lives to create that output.
+
+So you should determine whether writing feature like this is right for you, depending on 
+your environment (who is going to own & modify the code after you write it!). 
+"""
+
 from hamilton.function_modifiers import parameterized_inputs
 import pandas as pd
 
