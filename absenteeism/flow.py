@@ -46,12 +46,12 @@ class FeatureSelectionAndClassification(FlowSpec):
         Transform and document features using sf-hamilton.
         '''
         import pandas as pd
+        from sklearn.model_selection import train_test_split
+        from flow_utilities import hamilton_viz, Config
         from hamilton import driver
         import data_loader
         import feature_logic
         import normalized_features
-        from sklearn.model_selection import train_test_split
-        from flow_utilities import hamilton_viz, Config
 
         # create Hamilton driver and DAG
             # first argument is where the config file is
