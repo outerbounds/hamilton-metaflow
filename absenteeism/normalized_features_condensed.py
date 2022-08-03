@@ -27,13 +27,13 @@ NUMERIC_FEATURES = ['age', 'height', 'weight', 'body_mass_index', 'transportatio
 
 
 @parameterized_inputs(**{f'{k}_mean': dict(feature=k) for k in NUMERIC_FEATURES})
-def mean_computer(feature: pd.Series) -> pd.Series:
+def mean_computer(feature: pd.Series) -> float:
     """Average of {feature}"""
     return feature.mean()
 
 
 @parameterized_inputs(**{f'{k}_std_dev': dict(feature=k) for k in NUMERIC_FEATURES})
-def std_dev_computer(feature: pd.Series) -> pd.Series:
+def std_dev_computer(feature: pd.Series) -> float:
     """Standard deviation of {feature}"""
     return feature.std()
 
